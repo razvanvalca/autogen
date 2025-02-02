@@ -284,6 +284,7 @@ class AssistantAgent(BaseChatAgent, Component[AssistantAgentConfig]):
         ) = "You are a helpful AI assistant. Solve tasks using your tools. Reply with TERMINATE when the task has been completed.",
         model_client_stream: bool = False,
         reflect_on_tool_use: bool = False,
+        reflect_on_tool_use_instruction: str = "Summarize in one sentence the performed action.",
         tool_call_summary_format: str = "{result}",
         memory: Sequence[Memory] | None = None,
     ):
@@ -351,6 +352,7 @@ class AssistantAgent(BaseChatAgent, Component[AssistantAgentConfig]):
         else:
             self._model_context = UnboundedChatCompletionContext()
         self._reflect_on_tool_use = reflect_on_tool_use
+        self._reflect_on_tool_use_instruction = reflect_on_tool_use_instruction
         self._tool_call_summary_format = tool_call_summary_format
         self._is_running = False
 
@@ -494,7 +496,9 @@ class AssistantAgent(BaseChatAgent, Component[AssistantAgentConfig]):
 
         if self._reflect_on_tool_use:
             # Generate another inference result based on the tool call and result.
-            llm_messages = self._system_messages + await self._model_context.get_messages()
+            llm_messages = self._system_messages + await self._model_context.get_messages()            
+            llm_messages.append(UserMessage(content=self._reflect_on_tool_use_instruction, source="user"))
+            
             reflection_model_result: CreateResult | None = None
             if self._model_client_stream:
                 # Stream the model client.
@@ -514,9 +518,9 @@ class AssistantAgent(BaseChatAgent, Component[AssistantAgentConfig]):
                 )
             assert isinstance(reflection_model_result.content, str)
             # Add the response to the model context.
-            await self._model_context.add_message(
-                AssistantMessage(content=reflection_model_result.content, source=self.name)
-            )
+            # await self._model_context.add_message(
+            #     AssistantMessage(content=reflection_model_result.content, source=self.name)
+            # )
             # Yield the response.
             yield Response(
                 chat_message=TextMessage(
@@ -526,7 +530,7 @@ class AssistantAgent(BaseChatAgent, Component[AssistantAgentConfig]):
                 ),
                 inner_messages=inner_messages,
             )
-        else:
+        #else:
             # Return tool call result as the response.
             tool_call_summaries: List[str] = []
             for tool_call, tool_call_result in zip(tool_calls, tool_call_results, strict=False):
