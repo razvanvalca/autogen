@@ -66,6 +66,7 @@ class AssistantAgentConfig(BaseModel):
     system_message: str | None = None
     model_client_stream: bool
     reflect_on_tool_use: bool
+    reflect_on_tool_use_instruction: str
     tool_call_summary_format: str
 
 
